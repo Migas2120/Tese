@@ -1,0 +1,325 @@
+Project Summary for: ros_2_server
+--------------------------------------
+
+File type counts:
+     44 py
+      1 txt
+      1 sh
+      1 md
+
+Directory tree (depth 2):
+.
+├── core
+│   ├── app_runner.py
+│   ├── __init__.py
+│   └── logger.py
+├── __init__.py
+├── middle_man.py
+├── path
+│   ├── __init__.py
+│   └── path_planner.py
+├── project_summary.sh
+├── README.md
+├── ros
+│   ├── command_dispatcher.py
+│   ├── commands
+│   │   ├── arm_command.py
+│   │   ├── base_command.py
+│   │   ├── gps_goal_command.py
+│   │   ├── __init__.py
+│   │   ├── mode_command.py
+│   │   ├── prearm_command.py
+│   │   ├── takeoff_command.py
+│   │   └── vel_command.py
+│   ├── context
+│   │   ├── drone_instance.py
+│   │   └── __init__.py
+│   ├── control_center.py
+│   ├── __init__.py
+│   ├── mission
+│   │   ├── executor_manager.py
+│   │   ├── __init__.py
+│   │   ├── mission_executor.py
+│   │   ├── mission_factory.py
+│   │   ├── mission_manager.py
+│   │   └── mission_planner.py
+│   ├── node_wrapper.py
+│   ├── state
+│   │   ├── drone_state_manager.py
+│   │   └── __init__.py
+│   └── telemetry
+│       ├── battery_handler.py
+│       ├── gps_pose_handler.py
+│       ├── __init__.py
+│       ├── pose_handler.py
+│       ├── status_handler.py
+│       ├── telemetry_handler.py
+│       └── telemetry_manager.py
+├── summary.txt
+├── tcp
+│   ├── client.py
+│   ├── __init__.py
+│   └── server.py
+└── test_scripts
+    ├── global_position_test.py
+    ├── __init__.py
+    ├── manual_climb_test.py
+    ├── see_drone_path.py
+    └── send_inspection_mission.py
+
+10 directories, 47 files
+
+Scanning for function and class definitions...
+
+File: ./core/app_runner.py
+  class AppRunner:
+      def __init__(self, logger):
+      def start(self):
+      def publish_from_unity(self, message_json):
+      def shutdown(self):
+      def _log(self, level: str, msg: str):
+
+File: ./core/logger.py
+  def init_logger(debug_enabled: bool = False):
+
+File: ./core/__init__.py
+
+File: ./middle_man.py
+  def main():
+
+File: ./path/path_planner.py
+  class PathPlanner:
+      def __init__(self, logger=None):
+      def generate_path(self, waypoints: List[Waypoint]) -> List[Waypoint]:
+      def _shift_gps(self, origin: Waypoint, dx_m: float, dy_m: float, dz_m: float) -> Waypoint:
+      def _log(self, level, msg):
+
+File: ./path/__init__.py
+
+File: ./ros/commands/arm_command.py
+  class ArmCommand(BaseCommand):
+      def execute(self, ros, data: dict):
+      def _handle_response(self):
+          def callback(future):
+
+File: ./ros/commands/base_command.py
+  class BaseCommand(ABC):
+          class MyCommand(BaseCommand):
+              def execute(self, ros, data):
+      def __init__(self, logger: logging.Logger = None):
+      def execute(self, ros, data: dict):
+
+File: ./ros/commands/gps_goal_command.py
+  class GpsGoalCommand(BaseCommand):
+      def __init__(self, logger=None):
+      def _connect(self):
+      def execute(self, ros, data: dict):
+      def _send_gps_goal(self, lat, lon, alt):
+      def close(self):
+
+File: ./ros/commands/mode_command.py
+  class ModeCommand(BaseCommand):
+      def execute(self, ros, data: dict):
+      def _handle_response(self):
+          def callback(future):
+
+File: ./ros/commands/prearm_command.py
+  class PrearmCommand(BaseCommand):
+      def execute(self, ros, data: dict):
+      def _handle_response(self):
+          def callback(future):
+
+File: ./ros/commands/takeoff_command.py
+  class TakeoffCommand(BaseCommand):
+      def execute(self, ros, data: dict):
+      def _handle_response(self):
+          def callback(future):
+
+File: ./ros/commands/vel_command.py
+  class VelCommand(BaseCommand):
+      def execute(self, ros, data: dict):
+      def _build_twist_msg(self, ros, data: dict):
+
+File: ./ros/commands/__init__.py
+
+File: ./ros/command_dispatcher.py
+  class CommandDispatcher:
+      def __init__(self, ros_handler, logger=None):
+      def dispatch(self, data: dict):
+
+File: ./ros/context/drone_instance.py
+  class DroneInstance:
+      def __init__(self, domain_id, tcp_host, tcp_port, logger):
+      def _spin_node(self):
+      def tick_all(self, mission_planner):
+      def shutdown(self):
+      def _log(self, level: str, msg: str):
+
+File: ./ros/context/__init__.py
+
+File: ./ros/control_center.py
+  class ControlCenter:
+      def __init__(self, dispatcher, state_manager, logger):
+      def process_message(self, data: dict):
+      def _handle_velocity(self, data):
+      def _handle_takeoff(self):
+      def _handle_hover(self):
+      def _log(self, level: str, msg: str):
+
+File: ./ros/mission/executor_manager.py
+  class ExecutorManager:
+      def __init__(self, logger=None):
+      def add_executor(self, drone_id, planner, command_sender, pose_handler, state_manager, path_planner):
+      def remove_executor(self, drone_id):
+      def tick_all(self, mission_planner, drone_id):
+      def _log(self, level, msg):
+
+File: ./ros/mission/mission_executor.py
+  class MissionExecutor:
+      def __init__(self, drone_id, logger=None):
+      def is_idle(self):
+      def assign_mission(self, mission):
+      def set_path_planner(self, planner):
+      def set_command_sender(self, sender):
+      def set_pose_handler(self, pose_handler):
+      def set_state_manager(self, state_manager):
+      def tick(self):
+      def _prepare_path(self):
+      def _execute_current_step(self):
+      def _has_reached_waypoint(self, current_pose, target_waypoint, tolerance=3.0):
+      def _ensure_ready_to_fly(self):
+      def _log(self, level, msg):
+
+File: ./ros/mission/mission_factory.py
+  class MissionFactory:
+      def create_inspection_mission(
+      def create_patrol_mission(
+      def create_survey_mission(
+
+File: ./ros/mission/mission_manager.py
+  class MissionManager:
+      def __init__(self, mission_planner, logger=None):
+      def create_inspection_mission(self, mission_id: str, drone_id: str, points: list[tuple[float, float, float]], priority: int = 5, description: str = "") -> bool:
+      def _log(self, level: str, msg: str):
+
+File: ./ros/mission/mission_planner.py
+  class Waypoint:
+  class Mission:
+      def is_valid(self) -> bool:
+  class MissionPlanner:
+      def __init__(self, logger=None):
+      def add_mission(self, mission: Mission) -> bool:
+      def get_mission(self, mission_id: str) -> Optional[Mission]:
+      def update_mission(self, updated_mission: Mission) -> bool:
+      def remove_mission(self, mission_id: str) -> bool:
+      def list_missions(self) -> List[str]:
+      def get_next_priority_mission(self) -> Optional[Mission]:
+      def _log(self, msg: str):
+
+File: ./ros/mission/__init__.py
+
+File: ./ros/node_wrapper.py
+  class MiddleManNode(Node):
+      def __init__(self, logger=None, context=None, drone_id=11):
+      def set_tcp_client(self, client):
+      def publish_from_unity(self, message_json):
+      def set_pose_handler(self, pose_handler):
+      def _repeat_last_velocity(self):
+      def tick_with_planner(self, mission_planner):
+
+File: ./ros/state/drone_state_manager.py
+  class DroneStateManager:
+      def __init__(self, logger=None):
+      def set_armed(self, value: bool):
+      def set_mode(self, mode: int):
+      def set_in_air(self, value: bool):
+      def set_control_mode(self, mode: str):
+      def get_summary(self):
+
+File: ./ros/state/__init__.py
+
+File: ./ros/telemetry/battery_handler.py
+  class BatteryHandler(TelemetryHandler):
+      def __init__(self, node, logger=None):
+      def _callback(self, msg):
+      def get_serialized(self):
+
+File: ./ros/telemetry/gps_pose_handler.py
+  class GpsPoseHandler(TelemetryHandler):
+      def __init__(self, node, logger=None):
+      def _pose_callback(self, msg):
+      def get_serialized(self) -> dict:
+
+File: ./ros/telemetry/pose_handler.py
+  class PoseHandler(TelemetryHandler):
+      def __init__(self, node, logger=None):
+      def _callback(self, msg):
+      def get_serialized(self):
+
+File: ./ros/telemetry/status_handler.py
+  class StatusHandler(TelemetryHandler):
+      def __init__(self, node, logger=None):
+      def _callback(self, msg):
+      def get_serialized(self):
+
+File: ./ros/telemetry/telemetry_handler.py
+  class TelemetryHandler(ABC):
+      def __init__(self, logger=None):
+      def get_serialized(self) -> dict:
+
+File: ./ros/telemetry/telemetry_manager.py
+  class TelemetryManager:
+      def __init__(self, node, tcp_client, logger=None, interval_sec=1):
+      def _start_timer(self):
+      def _send_telemetry(self):
+
+File: ./ros/telemetry/__init__.py
+
+File: ./ros/__init__.py
+
+File: ./tcp/client.py
+  class TCPClient:
+      def __init__(self, host='192.168.1.196', port=12345, logger=None):
+      def run(self):
+      def stop(self):
+
+File: ./tcp/server.py
+  class TCPServer:
+      def __init__(self, ros_node, logger=None, host='127.0.0.1', port=65432):
+      def start(self):
+      def _accept_connection(self):
+      def _receive_message(self, sock):
+      def _disconnect_client(self, sock):
+      def _handle_exception(self, sock):
+      def stop(self):
+
+File: ./tcp/__init__.py
+
+File: ./test_scripts/global_position_test.py
+  def send_gps_goal(lat, lon, alt):
+
+File: ./test_scripts/manual_climb_test.py
+  class ClimbTester(Node):
+      def __init__(self):
+      def step(self):
+      def arm_done(self, future):
+      def mode_done(self, future):
+      def takeoff_done(self, future):
+      def start_climb(self, future):
+      def pose_callback(self, msg):
+  def main(args=None):
+
+File: ./test_scripts/see_drone_path.py
+  class PosePlotter(Node):
+      def __init__(self, waypoints):
+      def pose_callback(self, msg):
+      def update_plot(self):
+  def main():
+
+File: ./test_scripts/send_inspection_mission.py
+  def send_inspection_mission(host="127.0.0.1", port=65432):
+
+File: ./test_scripts/__init__.py
+
+File: ./__init__.py
+

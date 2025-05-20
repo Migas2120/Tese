@@ -1,10 +1,12 @@
 import threading
 import rclpy
 import os
+import datetime
 from rclpy.executors import SingleThreadedExecutor
 from ros_2_server.ros.node_wrapper import MiddleManNode
 from ros_2_server.tcp.client import TCPClient
 from ros_2_server.ros.telemetry.telemetry_manager import TelemetryManager
+from ros_2_server.ros.health.health_manager import DroneHealthManager
 
 
 class DroneInstance:
@@ -24,6 +26,7 @@ class DroneInstance:
         """
         self.domain_id = domain_id
         self.logger = logger
+        self.logfile = f"logs/telemetry_drone0_{datetime.datetime.now():%Y%m%d_%H%M%S}.jsonl"
 
          # === Set environment variable for domain ID (correct way for context isolation)
         os.environ['ROS_DOMAIN_ID'] = str(self.domain_id)
@@ -47,9 +50,20 @@ class DroneInstance:
         self.node.set_tcp_client(self.tcp_client)
 
         # === Telemetry Manager ===
-        self.telemetry_manager = TelemetryManager(self.node, self.tcp_client, logger=self.logger)
+        self.telemetry_manager = TelemetryManager(self.node, self.tcp_client, logger=self.logger, telemetry_log_file=self.logfile)
         self.node.set_pose_handler(self.telemetry_manager.gps)
         self._log("info", f"TelemetryManager initialized.")
+
+        # === Drone Health MOnotoring ===
+        battery_handler = self.telemetry_manager.battery
+        gps_handler = self.telemetry_manager.gps
+        pose_handler = self.telemetry_manager.pose
+        status_handler = self.telemetry_manager.status
+
+        self.health_manager = DroneHealthManager(
+            battery_handler, gps_handler, pose_handler, status_handler, logger=self.logger
+        )
+        self._log("info", f"DroneHealthManager initialized.")
 
         # === ROS Node thread ===
         self.node_thread = threading.Thread(target=self._spin_node, daemon=True)
@@ -64,9 +78,13 @@ class DroneInstance:
         executor.spin()
 
     def tick_all(self, mission_planner):
+        health = self.get_health_status()
         if hasattr(self.node, "tick_with_planner"):
-            self.node.tick_with_planner(mission_planner)
+            self.node.tick_with_planner(mission_planner, health_status=health)
 
+    def get_health_status(self):
+        return self.health_manager.get_health_status()
+    
     def shutdown(self):
         """Shutdown this drone instance cleanly."""
         self._log("info", f"Shutting down...")

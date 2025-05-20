@@ -89,24 +89,37 @@ class AppRunner:
 
                     points = [(float(x), float(y), float(z)) for x, y, z in waypoints]
 
-                    # --- Create a mission object using your MissionFactory/Planner ---
-                    # Note: Adjust as needed for your real Mission type/factory
-
                     if drone_ids:
                         # Assign directly to each drone's queue
                         for drone_id in drone_ids:
-                            mission = MissionFactory.create_inspection_mission(
-                                mission_id=mission_id,
-                                drone_id=drone_id,
-                                points=points,  # points already validated and converted above
-                                priority=priority,
-                                description=description,
-                                start_time=start_time
-                            )
                             drone = self.domain_to_drone.get(drone_id)
                             if not drone:
                                 self._log("warning", f"No drone found for domain_id {drone_id}.")
                                 continue
+
+                            # === Health check BEFORE assigning the mission ===
+                            health = drone.get_health_status()
+                            if health.get("system") == "CRIT":
+                                self._log("warning", f"Drone {drone_id} is in CRIT health state. Skipping mission assignment.")
+                                # Optional: Notify Unity that assignment was skipped due to health
+                                # if hasattr(self, "tcp_client"):
+                                #     self.tcp_client.send(json.dumps({
+                                #         "type": "mission_assignment_skipped",
+                                #         "drone_id": drone_id,
+                                #         "reason": "CRIT health",
+                                #         "health": health
+                                #     }))
+                                continue
+
+                            mission = MissionFactory.create_inspection_mission(
+                                mission_id=mission_id,
+                                drone_id=drone_id,
+                                points=points,
+                                priority=priority,
+                                description=description,
+                                start_time=start_time
+                            )
+
                             executor = drone.node.executor_manager.executors.get(drone_id)
                             if executor:
                                 executor.assign_mission(mission)
@@ -128,12 +141,12 @@ class AppRunner:
                         else:
                             self._log("warning", f"Failed to create mission '{mission_id}' in global pool.")
 
-
                 except KeyError as e:
                     self._log("error", f"Missing required field: {e}")
                 except Exception as e:
                     self._log("error", f"Exception during mission creation: {e}")
                 return
+
 
             if data.get("type") == "cancel_mission":
                 try:
@@ -156,6 +169,24 @@ class AppRunner:
                 except Exception as e:
                     self._log("error", f"Exception during mission cancellation: {e}")
                 return
+            
+            if data.get("type") == "get_health_status":
+                drone_id = data.get("drone_id")
+                if drone_id:
+                    drone = self.domain_to_drone.get(drone_id)
+                    if not drone:
+                        self._log("warning", f"No drone found for domain_id {drone_id}.")
+                        # Optionally send error response to Unity
+                        return
+                    health = drone.get_health_status()
+                    # Send health back to Unity (implement TCP response logic here)
+                    self.tcp_client.send(json.dumps({"type": "health_status", "drone_id": drone_id, "health": health}))
+                else:
+                    # Send health for all drones
+                    health_summary = {id: d.get_health_status() for id, d in self.domain_to_drone.items()}
+                    self.tcp_client.send(json.dumps({"type": "health_status_all", "health": health_summary}))
+                return
+        
             # === Default: Route by domain_id (non-mission messages) ===
             target_domain = data.get("domain_id")
             for drone in self.drones:

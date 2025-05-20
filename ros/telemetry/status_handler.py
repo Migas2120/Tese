@@ -41,3 +41,22 @@ class StatusHandler(TelemetryHandler):
                 "failsafe": list(self._latest.failsafe)  # convert from uint8[] to list
             }
         }
+    
+    def get_health_status(self):
+        if not self._latest:
+            return "UNKNOWN"
+
+        # If any failsafe flag is set, CRIT
+        if self._latest.failsafe and any(self._latest.failsafe):
+            return "CRIT"
+
+        # (Optional) Check for certain problematic modes
+        failsafe_modes = ["RTL", "LAND", "BRAKE", "FAILSAFE"]  # Add as needed
+        if hasattr(self._latest, "mode") and str(self._latest.mode).upper() in failsafe_modes:
+            return "WARN"
+
+        # (Optional) Logic for inconsistent armed/flying status
+        if self._latest.flying and not self._latest.armed:
+            return "WARN"
+
+        return "OK"

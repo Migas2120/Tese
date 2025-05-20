@@ -125,5 +125,5 @@ class MiddleManNode(Node):
             return
         self.vel_repeater.execute(self, self.last_velocity_data)
 
-    def tick_with_planner(self, mission_planner):
-        self.executor_manager.tick_all(mission_planner, drone_id=self.drone_id)
+    def tick_with_planner(self, mission_planner, health_status=None):
+        self.executor_manager.tick_all(mission_planner,health_status=health_status)

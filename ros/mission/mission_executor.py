@@ -62,6 +62,7 @@ class MissionExecutor:
             return
 
         if self.execution_phase == "waiting_for_ready":
+            self._log("info",f"before ensuring the drone is ready to fly")
             if self._ensure_ready_to_fly():
                 self._log("info", "Drone is ready to fly. Switching to path execution phase.")
                 self.execution_phase = "executing_path"
@@ -88,9 +89,8 @@ class MissionExecutor:
 
         try:
             current_gps = self.pose_handler._latest.pose.position
-
+            self.reference_altitude = self.pose_handler._home_position[2]
             # Capture the initial reference altitude at mission start
-            self.reference_altitude = current_gps.altitude
             self._log("debug", f"Captured reference altitude: {self.reference_altitude:.2f}m")
 
             current_position = Waypoint(current_gps.latitude, current_gps.longitude, 0)  # Only XY used
@@ -213,9 +213,10 @@ class MissionExecutor:
             return False
 
         if (self.pose_handler._latest.pose.position.altitude - self.reference_altitude) < 2:
-            self._log("debug", f"Current altitude {self.pose_handler._latest.pose.position.altitude:.2f}m still below safe threshold relative to reference.")
+            self._log("debug", f"Current altitude {self.pose_handler._latest.pose.position.altitude - self.reference_altitude:.2f}m still below safe threshold relative to reference.")
+            
             return False
-
+        
         return True
 
     def _log(self, level, msg):

@@ -40,18 +40,23 @@ class ExecutorManager:
         else:
             self._log("warning", f"No executor found for '{drone_id}' to remove.")
 
-    def tick_all(self, mission_planner, drone_id):
+    def tick_all(self, mission_planner, health_status=None):
         """
         Tick all managed executors and assign missions if idle and permitted.
+        get_health_status: function or lambda taking drone_id and returning its health dict.
         """
         for id, executor in self.executors.items():
             if executor.is_idle():
+                # Check health before assignment
+                if health_status and health_status.get("system") == "CRIT":
+                    self._log("warning", f"Drone {id} in CRIT state, skipping mission assignment.")
+                    continue
+
                 mission = mission_planner.get_next_priority_mission()
                 if mission:
-                    # Only assign if this drone is allowed to execute it
-                    if not mission.drone_ids or str(drone_id) in mission.drone_ids:
+                    if not mission.drone_ids or str(id) in mission.drone_ids:
                         executor.assign_mission(mission)
-                        self._log("info", f"Assigned mission '{mission.mission_id}' to drone {drone_id}.")
+                        self._log("info", f"Assigned mission '{mission.mission_id}' to drone {id}.")
             executor.tick()
 
     def _log(self, level, msg):

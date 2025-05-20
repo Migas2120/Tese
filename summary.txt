@@ -2,7 +2,8 @@ Project Summary for: ros_2_server
 --------------------------------------
 
 File type counts:
-     44 py
+     45 py
+     13 sample
       1 txt
       1 sh
       1 md
@@ -64,16 +65,18 @@ Directory tree (depth 2):
     ├── global_position_test.py
     ├── __init__.py
     ├── manual_climb_test.py
+    ├── plot_drone_path.py
     ├── see_drone_path.py
     └── send_inspection_mission.py
 
-10 directories, 47 files
+10 directories, 48 files
 
 Scanning for function and class definitions...
 
 File: ./core/app_runner.py
   class AppRunner:
       def __init__(self, logger):
+      def add_drone(self, drone):
       def start(self):
       def publish_from_unity(self, message_json):
       def shutdown(self):
@@ -199,7 +202,8 @@ File: ./ros/mission/mission_factory.py
 File: ./ros/mission/mission_manager.py
   class MissionManager:
       def __init__(self, mission_planner, logger=None):
-      def create_inspection_mission(self, mission_id: str, drone_id: str, points: list[tuple[float, float, float]], priority: int = 5, description: str = "") -> bool:
+      def create_inspection_mission(self, mission_id: str, drone_id: str, points: list[tuple[float, float, float]], priority: int = 5, description: str = "",start_time: float = None) -> bool:
+      def cancel_mission(self, mission_id: str) -> bool:
       def _log(self, level: str, msg: str):
 
 File: ./ros/mission/mission_planner.py
@@ -269,7 +273,7 @@ File: ./ros/telemetry/telemetry_handler.py
 
 File: ./ros/telemetry/telemetry_manager.py
   class TelemetryManager:
-      def __init__(self, node, tcp_client, logger=None, interval_sec=1):
+      def __init__(self, node, tcp_client, logger=None, telemetry_log_file=None, interval_sec=0.2):
       def _start_timer(self):
       def _send_telemetry(self):
 
@@ -309,6 +313,8 @@ File: ./test_scripts/manual_climb_test.py
       def pose_callback(self, msg):
   def main(args=None):
 
+File: ./test_scripts/plot_drone_path.py
+
 File: ./test_scripts/see_drone_path.py
   class PosePlotter(Node):
       def __init__(self, waypoints):
@@ -317,7 +323,7 @@ File: ./test_scripts/see_drone_path.py
   def main():
 
 File: ./test_scripts/send_inspection_mission.py
-  def send_inspection_mission(host="127.0.0.1", port=65432):
+  def send_inspection_mission():
 
 File: ./test_scripts/__init__.py
 

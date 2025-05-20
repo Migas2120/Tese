@@ -28,7 +28,7 @@ class TelemetryManager:
     Collects and sends drone telemetry data over TCP at regular intervals.
     """
 
-    def __init__(self, node, tcp_client, logger=None, interval_sec=1):
+    def __init__(self, node, tcp_client, logger=None, telemetry_log_file=None, interval_sec=0.2):
         """
         Parameters:
         - node: ROS 2 Node used by handlers to subscribe to data
@@ -50,6 +50,10 @@ class TelemetryManager:
         self.pose = PoseHandler(node)
         self.battery = BatteryHandler(node)
         self.gps = GpsPoseHandler(node)
+
+
+        self.telemetry_log_file = telemetry_log_file
+
 
         self.logger.info("[TelemetryManager] Initialized.")
         self._start_timer()
@@ -78,8 +82,25 @@ class TelemetryManager:
             "status": status_data.get("status") if status_data else None,
             "pose": pose_data,
             "battery": battery_data.get("battery") if battery_data else None,
-            "gps_pose": gps_data
+            "gps_pose": gps_data,
+            "timestamp": time.time()
         }
+
+        # Optionally add drone_id
+        if hasattr(self.node, "drone_id"):
+            payload["drone_id"] = self.node.drone_id
+
+        if self.telemetry_log_file:
+            try:
+                import os
+                os.makedirs(os.path.dirname(self.telemetry_log_file), exist_ok=True)
+                with open(self.telemetry_log_file, "a") as f:
+                    f.write(json.dumps(payload) + "\n")
+                    f.flush()
+                    os.fsync(f.fileno())
+            except Exception as e:
+                self.logger.error(f"Failed to log telemetry: {e}")
+
 
         try:
             json_str = json.dumps(payload, indent=2)

@@ -2,6 +2,10 @@ from sensor_msgs.msg import BatteryState
 from ros_2_server.ros.telemetry.telemetry_handler import TelemetryHandler
 from rclpy.qos import QoSProfile, ReliabilityPolicy
 
+# Thresholds can be moved to config/constants
+BATTERY_WARN = 0.30
+BATTERY_CRIT = 0.15
+
 class BatteryHandler(TelemetryHandler):
     def __init__(self, node, logger=None):
         super().__init__(logger)
@@ -32,3 +36,17 @@ class BatteryHandler(TelemetryHandler):
                 "percentage": self._latest.percentage
             }
         }
+
+    def get_health_status(self):
+        """
+        Returns: "OK", "WARN", or "CRIT"
+        """
+        if not self._latest:
+            return "UNKNOWN"
+        pct = self._latest.percentage
+        if pct < BATTERY_CRIT:
+            return "CRIT"
+        elif pct < BATTERY_WARN:
+            return "WARN"
+        else:
+            return "OK"

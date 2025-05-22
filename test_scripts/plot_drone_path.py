@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from mpl_toolkits.mplot3d import Axes3D
 
-log_file = "/mnt/c/Users/mcaeiro/Desktop/Tese/logs/telemetry_drone0_20250521_124436.jsonl"
+log_file = "/mnt/c/Users/mcaeiro/Desktop/Tese/logs/telemetry_drone0_20250522_145300.jsonl"
 
 xs, ys, zs = [], [], []
 battery_percents, battery_voltages = [], []

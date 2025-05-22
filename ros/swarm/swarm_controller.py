@@ -21,14 +21,14 @@ class SwarmController:
         for drone_id in self.drone_instances:
             # Instead of a takeoff method, just assign a mission with a single waypoint at the desired altitude
             # Here is a sample Mission object; adapt this to your own Mission definition
-            takeoff_waypoint = Waypoint(
+            home_waypoint = Waypoint(
                 x=0,  # or .latitude if named
                 y=0,  # or .longitude if named
                 z=target_altitude    # meters above ground/home
             )
             mission = Mission(
                 mission_id=f"swarm_takeoff_{drone_id}",
-                waypoints=[takeoff_waypoint],
+                waypoints=[home_waypoint],
                 drone_ids=[str(drone_id)],
                 priority=999,  # or any appropriate value
                 mission_type="swarm" 

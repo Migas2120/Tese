@@ -162,7 +162,7 @@ class MissionExecutor:
         except Exception as e:
             self._log("error", f"Failed to send GPS goal: {e}")
 
-    def _has_reached_waypoint(self, current_pose, target_waypoint, tolerance=0.5):
+    def _has_reached_waypoint(self, current_pose, target_waypoint, tolerance=2.0):
         """
         Check if the drone has reached the target waypoint.
         - Calculates distance in meters considering latitude, longitude, and relative altitude.
@@ -173,7 +173,7 @@ class MissionExecutor:
 
         distance = (dx**2 + dy**2 + dz**2) ** 0.5
 
-        self._log("debug", f"Distance to waypoint: {distance:.2f} m (dx={dx:.2f} m, dy={dy:.2f} m, dz={dz:.2f} m)")
+        self._log("info", f"Distance to waypoint: {distance:.2f} m (dx={dx:.2f} m, dy={dy:.2f} m, dz={dz:.2f} m)")
 
         return distance <= tolerance
 

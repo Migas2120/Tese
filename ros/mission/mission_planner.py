@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List, Optional, Dict, Tuple
 from dataclasses import dataclass, field
 import heapq
 import time
@@ -11,7 +11,8 @@ VALID_MISSION_TYPES = {
     "formation",    # Formation flight
     "follow",       # Follow a dynamic target
     "delivery",     # Go from A to B with optional payload
-    "hold"          # Hold position
+    "hold",         # Hold position
+    "swarm",     # Take off to a specific altitude
 }
 
 # Defines a waypoint in 3D space with optional hold time
@@ -32,7 +33,7 @@ class Mission:
     waypoints: List[Waypoint] = field(compare=False)
     start_time: Optional[float] = field(default=None, compare=False)
     description: Optional[str] = field(default="", compare=False)
-    start_time: Optional[float] = field(default=None, compare=False)
+    formation: Optional[str] = field(default=None, compare=False)
 
     def is_valid(self) -> bool:
         """
@@ -49,6 +50,10 @@ class Mission:
 
 # MissionPlanner manages missions by ID and also supports priority-based scheduling
 class MissionPlanner:
+    """
+    Data registry and scheduling for Missions.
+    No business logic or type-specific workflows.
+    """ 
     def __init__(self, logger=None):
         self.missions: dict[str, Mission] = {}  # Mission lookup by ID
         self.mission_queue: List[Mission] = []  # Priority queue (heap) of missions

@@ -1,5 +1,5 @@
 import math
-from ros_2_server.ros.mission.mission_planner import Waypoint
+from ros_2_server.ros.mission.mission_planner import Mission,Waypoint
 
 class MissionExecutor:
     """
@@ -12,6 +12,8 @@ class MissionExecutor:
     def __init__(self, drone_id, logger=None):
         self.drone_id = drone_id
         self.logger = logger
+
+        self.rth_active = False
 
         self.path_planner = None
         self.command_sender = None
@@ -35,13 +37,18 @@ class MissionExecutor:
         return self.current_mission is None
 
     def assign_mission(self, mission):
+        """
+        Assign a mission to the executor.
+        - If idle, start the mission.
+        - If busy, queue the mission
+        """
         if self.is_idle():
             self.current_mission = mission
             self._log("info", f"Started mission '{self.current_mission.mission_id}'.")
             self._prepare_path()
             self.execution_phase = "waiting_for_ready"
         else:
-            # Add to queue if already busy
+            # Simply queue any incoming mission
             self.missions_queue.append(mission)
             self._log("info", f"Queued mission '{mission.mission_id}' for later execution.")
 
@@ -57,21 +64,6 @@ class MissionExecutor:
     def set_state_manager(self, state_manager):
         self.state_manager = state_manager
 
-    def tick(self):
-        if not self.current_mission:
-            return
-
-        if self.execution_phase == "waiting_for_ready":
-            self._log("info",f"before ensuring the drone is ready to fly")
-            if self._ensure_ready_to_fly():
-                self._log("info", "Drone is ready to fly. Switching to path execution phase.")
-                self.execution_phase = "executing_path"
-            else:
-                return
-
-        if self.execution_phase == "executing_path":
-            self._execute_current_step()
-
     def _prepare_path(self):
         """
         Prepares the path for the current mission.
@@ -79,26 +71,28 @@ class MissionExecutor:
         - Generates path including current position.
         - Validates path.
         """
+
+        # Check if path planner is set.
         if not self.path_planner:
             self._log("error", "PathPlanner not set.")
             return
 
+        # Check if command sender is set.
         if not self.pose_handler or not self.pose_handler._latest:
             self._log("error", "No GPS pose available to prepare path.")
             return
 
         try:
-            current_gps = self.pose_handler._latest.pose.position
+            home_position_for_reference = self.pose_handler._home_position 
             self.reference_altitude = self.pose_handler._home_position[2]
-            # Capture the initial reference altitude at mission start
             self._log("debug", f"Captured reference altitude: {self.reference_altitude:.2f}m")
 
-            current_position = Waypoint(current_gps.latitude, current_gps.longitude, 0)  # Only XY used
+            current_position = Waypoint(home_position_for_reference[0], home_position_for_reference[1], 0)  # Only XY used
 
             # Prepend current position to mission waypoints
             mission_waypoints = [current_position] + self.current_mission.waypoints
 
-            # Generate the full path
+            # Calculate the path using the path planner
             self.current_path = self.path_planner.generate_path(mission_waypoints)
             self.current_waypoint_index = 0
             self._sent_current_goal = False
@@ -120,6 +114,8 @@ class MissionExecutor:
         - Checks if waypoint is reached.
         - Advances waypoint index when reached.
         """
+
+        # Check if the current waypoint index has passed the path length, if yes, mission is complete
         if self.current_waypoint_index >= len(self.current_path):
             self._log("info", f"Mission '{self.current_mission.mission_id}' completed.")
             self.current_mission = None
@@ -129,20 +125,24 @@ class MissionExecutor:
                 self.assign_mission(next_mission)
             return
 
+        # Check if command sender is set.
         if not self.command_sender:
             self._log("error", "CommandSender not set.")
             return
 
+        # Check if pose handler is set and has a valid latest pose.
         if not self.pose_handler or not self.pose_handler._latest:
             self._log("warning", "No current GPS pose available yet.")
             return
 
+        # Get the current target waypoint and the latest pose
         current_target = self.current_path[self.current_waypoint_index]
         current_pose = self.pose_handler._latest
 
         self._log("debug", f"Current GPS pose: {current_pose.pose.position.latitude}, {current_pose.pose.position.longitude}, {current_pose.pose.position.altitude}")
 
         try:
+             # Check if waypoint is reached
             if self._has_reached_waypoint(current_pose, current_target):
                 self._log("info", f"Waypoint {self.current_waypoint_index} reached.")
                 self.current_waypoint_index += 1
@@ -162,7 +162,7 @@ class MissionExecutor:
         except Exception as e:
             self._log("error", f"Failed to send GPS goal: {e}")
 
-    def _has_reached_waypoint(self, current_pose, target_waypoint, tolerance=3.0):
+    def _has_reached_waypoint(self, current_pose, target_waypoint, tolerance=0.5):
         """
         Check if the drone has reached the target waypoint.
         - Calculates distance in meters considering latitude, longitude, and relative altitude.
@@ -214,10 +214,38 @@ class MissionExecutor:
 
         if (self.pose_handler._latest.pose.position.altitude - self.reference_altitude) < 2:
             self._log("debug", f"Current altitude {self.pose_handler._latest.pose.position.altitude - self.reference_altitude:.2f}m still below safe threshold relative to reference.")
-            
             return False
-        
+
         return True
+
+    def abort_current_mission(self):
+        """
+        Abort the current mission and clear the mission queue.
+        """
+        if self.current_mission:
+            self._log("warning", f"Aborting mission '{self.current_mission.mission_id}' due to abort command or failsafe.")
+            self.current_mission = None
+            self.execution_phase = "waiting_for_ready"
+        if self.missions_queue:
+            self._log("info", "Clearing mission queue due to abort/failsafe.")
+            self.missions_queue.clear()
+        self.clear_rth()
+
+    def clear_rth(self):
+        self.rth_active = False
+
+    def tick(self):
+        # --- Normal mission handling ---
+        if not self.current_mission:
+            return
+        if self.execution_phase == "waiting_for_ready":
+            if self._ensure_ready_to_fly():
+                self._log("info", "Drone is ready to fly. Switching to path execution phase.")
+                self.execution_phase = "executing_path"
+            else:
+                return
+        if self.execution_phase == "executing_path":
+            self._execute_current_step()
 
     def _log(self, level, msg):
         """
@@ -230,3 +258,4 @@ class MissionExecutor:
             log_fn(f"{tag} {msg}")
         else:
             print(f"{tag} {msg}")
+     

@@ -15,8 +15,10 @@ Telemetry is sent out at a configurable interval (default: 1 second).
 
 import json
 import time
+import os
 import logging
 from threading import Timer
+from typing import Callable, Dict, Optional, Any
 
 from ros_2_server.ros.telemetry.status_handler import StatusHandler
 from ros_2_server.ros.telemetry.pose_handler import PoseHandler

@@ -6,6 +6,7 @@ from ros_2_server.ros.context.drone_instance import DroneInstance
 from ros_2_server.ros.mission.mission_planner import MissionPlanner
 from ros_2_server.ros.mission.mission_manager import MissionManager
 from ros_2_server.ros.mission.mission_factory import MissionFactory
+from ros_2_server.ros.swarm.swarm_controller import SwarmController 
 from ros_2_server.tcp.server import TCPServer
 
 class AppRunner:
@@ -28,6 +29,8 @@ class AppRunner:
         # Maps domain_id to DroneInstance
         self.domain_to_drone = {}
 
+        self.swarm_controller = None
+
     def add_drone(self, drone):
         """
         Adds a DroneInstance to the list and updates the domain-to-drone mapping.
@@ -44,10 +47,17 @@ class AppRunner:
         # drone2 = DroneInstance(domain_id=12, tcp_host='192.168.1.196', tcp_port=12346, logger=self.logger)
 
         self.add_drone(drone1)
-        # self.drones.append(drone2)
-
+        # self.add_drone(drone2)
 
         self.domain_to_drone = {drone.domain_id: drone for drone in self.drones}
+
+        # === Swarm Controller ===
+        # Pass all executor managers as a dict to SwarmController (not just one manager)
+        self.swarm_controller = SwarmController(
+            drone_instances={d.domain_id: d for d in self.drones},
+            executor_managers={d.domain_id: d.node.executor_manager for d in self.drones}
+        )
+        
         # === Start TCP Server ===
         self._log("info", "Starting central TCP server...")
         self.tcp_server = TCPServer(ros_node=self, logger=self.logger, host='127.0.0.1', port=65432)
@@ -89,43 +99,49 @@ class AppRunner:
 
                     points = [(float(x), float(y), float(z)) for x, y, z in waypoints]
 
-                    if drone_ids:
-                        # Assign directly to each drone's queue
-                        for drone_id in drone_ids:
-                            drone = self.domain_to_drone.get(drone_id)
-                            if not drone:
-                                self._log("warning", f"No drone found for domain_id {drone_id}.")
-                                continue
+                    if drone_ids and len(drone_ids) == 1:
+                        # === Single drone: Assign directly as before ===
+                        drone_id = drone_ids[0]
+                        drone = self.domain_to_drone.get(drone_id)
+                        if not drone:
+                            self._log("warning", f"No drone found for domain_id {drone_id}.")
+                            return
 
-                            # === Health check BEFORE assigning the mission ===
-                            health = drone.get_health_status()
-                            if health.get("system") == "CRIT":
-                                self._log("warning", f"Drone {drone_id} is in CRIT health state. Skipping mission assignment.")
-                                # Optional: Notify Unity that assignment was skipped due to health
-                                # if hasattr(self, "tcp_client"):
-                                #     self.tcp_client.send(json.dumps({
-                                #         "type": "mission_assignment_skipped",
-                                #         "drone_id": drone_id,
-                                #         "reason": "CRIT health",
-                                #         "health": health
-                                #     }))
-                                continue
+                        health = drone.get_health_status()
+                        if health.get("system") == "CRIT":
+                            self._log("warning", f"Drone {drone_id} is in CRIT health state. Skipping mission assignment.")
+                            return
 
-                            mission = MissionFactory.create_inspection_mission(
-                                mission_id=mission_id,
-                                drone_id=drone_id,
-                                points=points,
-                                priority=priority,
-                                description=description,
-                                start_time=start_time
-                            )
+                        mission = MissionFactory.create_inspection_mission(
+                            mission_id=mission_id,
+                            drone_id=drone_id,
+                            points=points,
+                            priority=priority,
+                            description=description,
+                            start_time=start_time
+                        )
 
-                            executor = drone.node.executor_manager.executors.get(drone_id)
-                            if executor:
-                                executor.assign_mission(mission)
-                                self._log("info", f"Assigned mission '{mission_id}' directly to drone {drone_id}.")
-                            else:
-                                self._log("warning", f"No executor found for drone {drone_id}.")
+                        # === Change: Now assign directly to the executor_manager (single-drone) ===
+                        executor_manager = drone.node.executor_manager
+                        if executor_manager:
+                            executor_manager.assign_mission(mission)
+                            self._log("info", f"Assigned mission '{mission_id}' directly to drone {drone_id}.")
+                        else:
+                            self._log("warning", f"No executor manager found for drone {drone_id}.")
+
+                    elif drone_ids and len(drone_ids) > 1:
+                        # === Multi-drone: Route to SwarmController ===
+                        # NOTE: You may want to include formation type or mission type in the data dict
+                        self.swarm_controller.handle_multi_drone_mission(
+                            mission_id=mission_id,
+                            drone_ids=drone_ids,
+                            points=points,
+                            priority=priority,
+                            description=description,
+                            start_time=start_time,
+                            extra=data  # Can pass the whole dict for more metadata (formation type, etc)
+                        )
+                        self._log("info", f"Multi-drone mission '{mission_id}' routed to SwarmController.")
                     else:
                         # Add to global mission pool
                         success = self.mission_manager.create_inspection_mission(
@@ -146,8 +162,7 @@ class AppRunner:
                 except Exception as e:
                     self._log("error", f"Exception during mission creation: {e}")
                 return
-
-
+            
             if data.get("type") == "cancel_mission":
                 try:
                     mission_id = data["mission_id"]
@@ -155,12 +170,12 @@ class AppRunner:
                     success = self.mission_manager.cancel_mission(mission_id)
                     # Also remove from all executors (per-drone queues)
                     for drone in self.drones:
-                        for executor in drone.node.executor_manager.executors.values():
-                            # Remove from queue if queued, or interrupt if currently running
+                        executor_manager = drone.node.executor_manager
+                        if executor_manager:
+                            executor = executor_manager.executor  # If you have an 'executor' attribute
                             if executor.current_mission and executor.current_mission.mission_id == mission_id:
                                 executor._log("info", f"Cancelling currently executing mission '{mission_id}'.")
                                 executor.current_mission = None
-                            # Remove from queue (for queued, not yet running)
                             executor.missions_queue = [m for m in executor.missions_queue if m.mission_id != mission_id]
                     if success:
                         self._log("info", f"Mission '{mission_id}' cancelled everywhere.")

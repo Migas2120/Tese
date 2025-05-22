@@ -12,6 +12,18 @@ This node integrates:
 - A ControlCenter for message routing and logic
 """
 
+
+# TODO: Split mission and executor logic into MissionController or MissionManager
+# TODO: Extract all velocity command logic to VelocityManager
+# TODO: Extract Unity/TCP handling to UnityBridge/TCPBridge
+# TODO: Only handle ROS node lifecycle here; delegate all business logic
+# TODO: Reduce direct attribute access (Law of Demeter)
+# TODO: Add docstrings to every new helper class
+# TODO: Add unit tests for MissionController and VelocityManager, independent of ROS
+# TODO: Replace direct instantiations with dependency injection for easier testing
+
+
+
 import rclpy
 import time
 import json
@@ -54,17 +66,10 @@ class MiddleManNode(Node):
         self.state = DroneStateManager(logger=self.logger)
         self.path_planner = PathPlanner(logger=self.logger)
 
-        self.executor_manager = ExecutorManager(logger=self.logger)
-
-
-        self.executor_manager.add_executor(
-            drone_id=self.drone_id,
-            planner=None,
-            command_sender=self.dispatcher,
-            pose_handler=None,
-            state_manager=self.state,
-            path_planner=self.path_planner
-        )
+        self.executor_manager = ExecutorManager(drone_id=self.drone_id, logger=self.logger)
+        self.executor_manager.set_command_sender(self.dispatcher)
+        self.executor_manager.set_state_manager(self.state)
+        self.executor_manager.set_path_planner(self.path_planner)
 
         self.control_center = ControlCenter(
             dispatcher=self.dispatcher,
@@ -111,12 +116,10 @@ class MiddleManNode(Node):
             self.logger.error("Invalid JSON received.")
 
     def set_pose_handler(self, pose_handler):
-        executor = self.executor_manager.executors.get(self.drone_id)
-        if executor:
-            executor.set_pose_handler(pose_handler)
-            self.logger.info(f"[MiddleManNode] PoseHandler injected into executor for drone {self.drone_id}.")
-        else:
-            self.logger.warning(f"[MiddleManNode] No executor found for drone {self.drone_id}.")
+        self.executor_manager.set_pose_handler(pose_handler)
+        self.logger.info(f"[MiddleManNode] PoseHandler injected into executor for drone {self.drone_id}.")
+
+
 
     def _repeat_last_velocity(self):
         if self.last_velocity_data is None:
@@ -126,4 +129,4 @@ class MiddleManNode(Node):
         self.vel_repeater.execute(self, self.last_velocity_data)
 
     def tick_with_planner(self, mission_planner, health_status=None):
-        self.executor_manager.tick_all(mission_planner,health_status=health_status)
+        self.executor_manager.tick(mission_planner, health_status=health_status)

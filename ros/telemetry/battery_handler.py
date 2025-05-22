@@ -4,7 +4,7 @@ from rclpy.qos import QoSProfile, ReliabilityPolicy
 
 # Thresholds can be moved to config/constants
 BATTERY_WARN = 0.30
-BATTERY_CRIT = 0.15
+BATTERY_CRIT = 0.20
 
 class BatteryHandler(TelemetryHandler):
     def __init__(self, node, logger=None):
